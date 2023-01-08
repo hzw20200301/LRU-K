@@ -2,7 +2,7 @@
 use std::collections::{LinkedList, HashMap};
 use std::io;
 
-//定义LRU缓存结构
+//定义LRU-2缓存结构
 struct Lru2Cache<T> {
     //历史队列，采用FIFO淘汰策略，采用双向链表实现
     history: LinkedList<T>,
