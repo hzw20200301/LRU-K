@@ -80,6 +80,60 @@ struct Lru2Cache<T> {
 ## 4、使用流程  
     本次LRU-2算法将数字作为页面进行访问模拟，使用者可以设定 history_size 和 cache_size 分别作为 history 和 cache 队列的阈值大小，
     此后以空格为间隔输入模拟访问序列。这里用 history_size=2、cache_size=2、访问序列为 1、2、1、2、3、1、4、3、5、6进行模拟实验，
-    选用原因为尽可能的将不同队列的情况进行考虑。
+    选用原因为尽可能的将不同队列的情况进行考虑。同时优先删除的数据均位于链表头部
 ### 示例如下：（令history_size=2、cache_size=2、访问序列为 1、2、1、2、3、1、4、3、5、6）
+编译运行：  
+
+![编译运行](https://github.com/hzw20200301/LRU-K/blob/master/images/编译且运行.png)  
+
+输入变量：  
+
+![输入](https://github.com/hzw20200301/LRU-K/blob/master/images/输入.png)  
+
+初始队列：  
+<img src="https://github.com/hzw20200301/LRU-K/blob/master/images/1.png" height="175">  
+### 下面为输出结果（左）和理想情况的队列变化情况（右）：
+输入第1个数字1：  
+
+<img src="https://github.com/hzw20200301/LRU-K/blob/master/images/队列状况1.png" height="175">    <img src="https://github.com/hzw20200301/LRU-K/blob/master/images/2.png" height="175">  
+
+输入第2个数字2：  
+
+<img src="https://github.com/hzw20200301/LRU-K/blob/master/images/队列状况2.png" height="175">    <img src="https://github.com/hzw20200301/LRU-K/blob/master/images/3.png" height="175">
+
+输入第3个数字1：  
+
+<img src="https://github.com/hzw20200301/LRU-K/blob/master/images/队列状况3.png" height="175">    <img src="https://github.com/hzw20200301/LRU-K/blob/master/images/4.png" height="175">
+
+输入第4个数字2：  
+
+<img src="https://github.com/hzw20200301/LRU-K/blob/master/images/队列状况4.png" height="175">    <img src="https://github.com/hzw20200301/LRU-K/blob/master/images/5.png" height="175">
+
+输入第5个数字3：  
+
+<img src="https://github.com/hzw20200301/LRU-K/blob/master/images/队列状况5.png" height="175">    <img src="https://github.com/hzw20200301/LRU-K/blob/master/images/6.png" height="175">
+
+输入第6个数字1：  
+
+<img src="https://github.com/hzw20200301/LRU-K/blob/master/images/队列状况6.png" height="175">    <img src="https://github.com/hzw20200301/LRU-K/blob/master/images/7.png" height="175">
+
+输入第7个数字4：  
+
+<img src="https://github.com/hzw20200301/LRU-K/blob/master/images/队列状况7.png" height="175">    <img src="https://github.com/hzw20200301/LRU-K/blob/master/images/8.png" height="175">
+
+输入第8个数字3：  
+
+<img src="https://github.com/hzw20200301/LRU-K/blob/master/images/队列状况8.png" height="175">    <img src="https://github.com/hzw20200301/LRU-K/blob/master/images/9.png" height="175">
+
+输入第9个数字5：  
+
+<img src="https://github.com/hzw20200301/LRU-K/blob/master/images/队列状况9.png" height="175">    <img src="https://github.com/hzw20200301/LRU-K/blob/master/images/10.png" height="175">
+
+输入第10个数字6：  
+
+<img src="https://github.com/hzw20200301/LRU-K/blob/master/images/队列状况10.png" height="175">    <img src="https://github.com/hzw20200301/LRU-K/blob/master/images/11.png" height="175">
+
 ## 5、注意事项
+* 注意：在 Rust 1.49 之前，需要使用 #![feature(linked_list_remove)] 开启 LinkedList 类型的 remove() 方法。而使用该语句似乎需要安装nightly版本，我这里采用的方式为使用rustup overwrite设置当前项目使用的channel ：在命令行输入`rustup override set nightly`  
+
+* 我在本次项目中使用的版本为：`rustc 1.68.0-nightly (388538fc9 2023-01-05)`
