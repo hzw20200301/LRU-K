@@ -48,7 +48,7 @@ where
                     self.map.insert(*element, (usize::max_value(), cache_map_num - 1));
                 }
 
-                // 将其移动到 cache 的头部
+                // 将其移动到 cache 的尾部
                 self.cache.remove(cache_index);
                 self.cache.push_back(value);
                 
@@ -72,7 +72,7 @@ where
                     self.map.remove(&value_to_remove);
                 }
 
-                // 将相同元素移动到 cache 的头部
+                // 将相同元素移动到 cache 的尾部
                 self.cache.push_back(value);
 
                 //更改移动元素map映射索引值
@@ -87,7 +87,7 @@ where
                     }                   
                 }
 
-                // 将元素插入到 history 的头部
+                // 将元素插入到 history 的尾部
                 self.history.push_back(value);
                 self.map.insert(value, (self.history.len() - 1, usize::max_value()));
         }
