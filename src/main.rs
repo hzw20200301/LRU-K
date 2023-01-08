@@ -1,157 +1,154 @@
-﻿//LRU缓存Rust简单实现
-use std::rc::Rc;
-use std::cell::RefCell;
-use std::collections::HashMap;
+﻿#![feature(linked_list_remove)]
+use std::collections::{LinkedList, HashMap};
+use std::io;
 
-struct Node {
-    key: i32, value: i32,
-    prev: Option<Rc<RefCell<Node>>>,
-    next: Option<Rc<RefCell<Node>>>
+//定义LRU缓存结构
+struct Lru2Cache<T> {
+    //历史队列，采用FIFO淘汰策略，采用双向链表实现
+    history: LinkedList<T>,
+    
+    //缓存队列，采用LRU淘汰策略，采用双向链表实现
+    cache: LinkedList<T>,
+    
+    //历史队列的容量，即它能容纳的最大条目数
+    history_size: usize,
+    
+    //缓存队列的容量，即它能容纳的最大条目数
+    cache_size: usize,
+    
+    //哈希映射，存储值到索引的映射
+    map: HashMap<T, (usize, usize)>,
 }
 
-impl Node {
-    fn new(key: i32, value: i32) -> Self {
-        Node {
-            key, value,
-            prev: None, next: None
+impl<T> Lru2Cache<T>
+where
+    T: Eq + std::hash::Hash + Copy + std::fmt::Display,
+{
+     //构造函数创建一个新的LRU缓存，具有给定的容量和要保留的项的数量
+    fn new(history_size: usize, cache_size: usize) -> Self {
+        Lru2Cache {
+            history: LinkedList::new(),
+            cache: LinkedList::new(),
+            history_size,
+            cache_size,
+            map: HashMap::new(), 
         }
     }
-}
+    
+    //模拟访问数据并进行处理
+    fn insert(&mut self, value: T) {
+        //判断元素是否已在两队列中
+        if let Some((_history_index, _cache_index)) = self.map.get(&value) {
+            // 如果元素在 cache 中
+            if let Some(cache_index) = self.map.get(&value).and_then(|(_, cache_index)| Some(*cache_index)).filter(|index| *index != usize::max_value()) {
+                //更改 cache 队列中移动元素后的元素的map映射 cache 索引值
+                for element in self.cache.iter_mut().skip(cache_index + 1) {
+                    let (_, cache_map_num) = self.map.get(element).unwrap();
 
-struct LRUCache {
-    //hash缓存，便于查找
-    cache: HashMap<i32,Rc<RefCell<Node>>>,
-    //伪头尾，便于操作节点时不用关心其前后节点是否存在
-    head: Rc<RefCell<Node>>, tail: Rc<RefCell<Node>>,
-    //大小<=容量
-    size: usize, capacity: usize
-}
-
-impl LRUCache {
-    fn new(capacity: i32) -> Self {
-        let capacity = match capacity < 1 {
-            true => 1 as usize,
-            false => capacity as usize
-        };
-        let head = Rc::from(RefCell::from(Node::new(-1,-1)));
-        let tail = Rc::new(RefCell::new(Node::new(-2,-2)));
-        head.borrow_mut().next = Option::from(tail.clone());
-        tail.borrow_mut().prev = Some(head.clone());
-        Self {
-            cache: HashMap::with_capacity(capacity),
-            head, tail,
-            size: 0 as usize, capacity,
-        }
-    }
-
-    ///以key获取value
-    fn get(&mut self, key: i32) -> i32 {
-        if let Some(node_ref) = self.cache.get(&key) {
-            self.move_to_head(node_ref);
-            return node_ref.borrow().value;
-        }
-        -1
-    }
-
-    ///插入key-value
-    fn put(&mut self, key: i32, value: i32) {
-        match self.cache.get(&key) {
-            // 如果 key 不存在，创建一个新的节点
-            None => {
-                //到达容量上限，则先清除最老的数据
-                if self.size == self.capacity {
-                    self.size -= 1;
-                    if let Some(node) = self.remove_tail() {
-                        self.cache.remove(&node.borrow().key);
-                    }
+                    self.map.insert(*element, (usize::max_value(), cache_map_num - 1));
                 }
-                self.size += 1;
-                let node = Rc::new(RefCell::new(Node::new(key,value)));
-                self.cache.insert(key,node.clone());
-                self.move_to_head(&node);
-            }
-            // 存在则移动到头部并改写其值
-            Some(node_ref) => {
-                node_ref.borrow_mut().value = value;
-                self.move_to_head(node_ref);
-            }
+
+                // 将其移动到 cache 的头部
+                self.cache.remove(cache_index);
+                self.cache.push_back(value);
+                
+                //更改移动元素map映射索引值
+                self.map.insert(value, (usize::max_value(), self.cache.len() - 1));
+
+            // 如果元素有相同值在 history 中
+            }else if let Some(history_index) = self.map.get(&value).and_then(|(history_index, _)| Some(*history_index)).filter(|index| *index != usize::max_value()) { 
+                //更改 history 队列中移动元素后的元素的map映射 history 索引值
+                for element in self.history.iter_mut().skip(history_index + 1) {
+                    let (history_map_num, _) = self.map.get(element).unwrap();
+                    self.map.insert(*element, (history_map_num - 1, usize::max_value()));
+                }
+
+                // 删除 history 中的相同元素
+                self.history.remove(history_index);
+
+                // 如果 cache 已满，则将 cache 最后一个元素移除
+                if self.cache.len() == self.cache_size {
+                    let value_to_remove = self.cache.pop_front().unwrap();
+                    self.map.remove(&value_to_remove);
+                }
+
+                // 将相同元素移动到 cache 的头部
+                self.cache.push_back(value);
+
+                //更改移动元素map映射索引值
+                self.map.insert(value, (usize::max_value(), self.cache.len() - 1));
+            } 
+        // 如果元素不在 cache 和 history 中
+        } else {
+                // 如果 history 满，则将 history 最后一个元素移除
+                if self.history.len() == self.history_size {
+                    if let Some(value_to_remove) = self.history.pop_front() {
+                        self.map.remove(&value_to_remove);
+                    }                   
+                }
+
+                // 将元素插入到 history 的头部
+                self.history.push_back(value);
+                self.map.insert(value, (self.history.len() - 1, usize::max_value()));
+        }
+
+        //输出元素在 history 和 cache 队列中的索引
+        for (key, (first, second)) in &self.map {
+            println!("key: {} history_index: {} cache_index: {}", key, first, second);
         }
     }
 
-    fn move_to_head(&self, node: &Rc<RefCell<Node>>){
-        Self::remove_node(node);
-        self.add_to_head(node);
+    //获取历史队列当前状态
+    fn get_history_list(&self) -> Vec<T> {
+        println!("此时 History 队列大小：{}", self.history.len());
+        self.history.iter().copied().collect()
     }
 
-    ///将节点添加到头部
-    fn add_to_head(&self, node: &Rc<RefCell<Node>>) {
-        //当前节点的prev指向head
-        node.borrow_mut().prev.replace(self.head.clone());
-        //原头部节点
-        if let Some(head_next_ref) = &self.head.borrow().next {
-            //当前节点的next指向head的next，完成自身移动到头部
-            node.borrow_mut().next.replace(head_next_ref.clone());
-            //原来头节点next的prev指向当前节点
-            head_next_ref.borrow_mut().prev.replace(node.clone());
-        }
-        //原来头节点的next指向将当前节点，完成原来的头部后移为第二位
-        self.head.borrow_mut().next.replace(node.clone());
-    }
-
-    ///从链表中删除尾节点，并返回该节点
-    fn remove_tail(&mut self) -> Option<Rc<RefCell<Node>>> {
-        if let Some(node) = &self.tail.borrow().prev {
-            let node = Self::remove_node(&node);
-            return Some(node.clone());
-        }
-        None
-    }
-
-    ///由于需要同时持有node的可变借用,使用unsafe
-    unsafe fn remove_node_unsafe(node: &Rc<RefCell<Node>>) -> Rc<RefCell<Node>>{
-        if let Some(prev) = &node.borrow().prev {
-            if let Some(next) = &node.borrow().next {
-                //将前一节点的后置节点指向当前节点的后置节点
-                prev.borrow_mut().next.replace(next.clone());
-                //预先克隆并返回克隆值,避免返回当前节点处在尾部时下一步操作将其内部Node改变为操作后的尾部
-                let node = node.clone();
-                //将后一节点的前置节点指向当前节点的前置节点,当移除最老节点时这个操作对于tail而言改变了尾部节点
-                (*next.as_ptr()).prev = Some(prev.clone());//这里的裸指针就是使用usafe的原因(next.borrow_mut()将报错:already borrowed: BorrowMutError)
-                //(*node.as_ptr()).prev = None;
-                //(*node.as_ptr()).next = None;
-                return node;
-            }
-        }
-        node.clone()
-    }
-
-    //将节点从链表中移除
-    fn remove_node(node: &Rc<RefCell<Node>>)  -> Rc<RefCell<Node>>{
-        unsafe {
-            return Self::remove_node_unsafe(node);
-        }
-
+    //获取缓存队列当前状态
+    fn get_cache_list(&self) -> Vec<T> {
+        println!("此时 Cache 队列大小：{}", self.cache.len());
+        self.cache.iter().copied().collect()
     }
 }
 
-///测试
+
 fn main() {
-    let mut cache = LRUCache::new(2);
-    cache.put(1,11);
-    cache.put(2,22);
-    println!("get 1 {}  1",cache.get(1));
-    cache.put(3,33);
-    println!("get 2 {}  -1",cache.get(2));
-    cache.put(4,44);
-    cache.put(3,333);
-    println!("get 1 {}  -1",cache.get(1));
-    println!("get 3 {}  3",cache.get(3));
-    println!("get 4 {}  4",cache.get(4));
+    println!("请输入历史队列的阈值大小 : ");
+
+    let mut history_size = String::new();
+    io::stdin().read_line(&mut history_size).expect("无法读取输入");
+
+    println!("请输入缓存队列的阈值大小 : ");
+
+    let mut cache_size = String::new();
+    io::stdin().read_line(&mut cache_size).expect("无法读取输入");
+
+    let history_size: usize = history_size.trim().parse().expect("无法转换为数字");
+    let cache_size: usize = cache_size.trim().parse().expect("无法转换为数字");
+    let mut cache = Lru2Cache::new(history_size, cache_size);
+
+    println!("请输入一连串以空格间隔的数字：");
+
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).expect("无法读取输入");
+
+    let numbers: Vec<i32> = input
+        .split_whitespace()
+        .map(|s| s.parse().unwrap())
+        .collect();
+    
+    let mut i = 1;
+    
+    println!();
+
+    for number in numbers {
+        println!("当输入第{}个数字{}时：", i, number);
+        println!("元素在map中的索引值情况为：");
+        cache.insert(number);
+        i = i + 1;
+        println!("历史队列与缓存队列情况如下：");
+        println!("History: {:?}", cache.get_history_list());
+        println!("Cache: {:?}\n", cache.get_cache_list());
+    }
 }
-/*
-get 1 11  1
-get 2 -1  -1
-get 1 -1  -1
-get 3 333  3
-get 4 44  4
-*/
+
